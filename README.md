@@ -1,7 +1,8 @@
-# vcf2jg — VC Formal Tcl → JasperGold Tcl
+# vcf2jg — Synopsys VC Formal Tcl to Cadence JasperGold Tcl converter
 
-Python converter that translates **Synopsys VC Formal** run scripts into
-**Cadence JasperGold** Tcl.
+Python converter that translates **Synopsys VC Formal** (VCF) Tcl scripts into
+**Cadence JasperGold** Tcl. Use it to convert a VC Formal FPV run script to a
+JasperGold FPV Tcl script.
 
 This is a **best-effort FPV flow translator**, not a full Tcl interpreter.
 Tool-specific apps (FTA, AEP, SEC) and advanced options need human review
