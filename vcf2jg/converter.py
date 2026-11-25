@@ -1,18 +1,9 @@
 """
 Convert Synopsys VC Formal Tcl scripts to Cadence JasperGold Tcl scripts.
 
-Best-effort translator covering the two common VC Formal FPV dialects plus
-the commands from the VC Formal Property Checking App Quick Guide:
-
-1.  modern VC Formal:
-   analyze / analyze_design / elaborate / create_clock / create_reset /
-   sim_force / sim_run / sim_save_reset / check_fv
-
-2. Classic / public FPV flows:
-   read_file / create_reset -high|-low / fvassume / fvassert / fvcover /
-   report_fv
-
-Output targets Jasper Apps FPV (command reference 2025.03):
+Best-effort FPV translator for VC Formal Property Checking App commands
+(analyze / read_file / elaborate / clock / reset / check_fv / fvassume / …)
+to Jasper Apps FPV (command reference 2025.03):
 
     clear -all
     analyze -sv09 <files>
@@ -76,10 +67,9 @@ class _Ctx(object):
         self.prove_time_limit = None  # type: Optional[str]
         self.want_check_reset = False
 
-        # Reset: LUBIS style reset -none + assume -reset <expr>
+        # Reset: reset -none + assume -reset <expr>
         # expr is active-condition: "rst" (high) or "!rst_n" / "~rst_n" (low)
         self.reset_assume_expr = None  # type: Optional[str]
-        self.reset_style = "lubis"  # lubis | classic
         self.classic_reset_cmd = None  # type: Optional[str]
         # riscv-formal NERV/RVFI: Jasper native "reset <sig>", patch defines.sv
         self.rvfi_style = False
@@ -97,7 +87,7 @@ class _Ctx(object):
         self.disable_auto_bbox = False
         self.pending_elaborate_top = False
 
-        # Analyze language default (trainee hand scripts use -sv09)
+        # Analyze language default for VC Formal sverilog
         self.analyze_lang = "-sv09"
 
         # Simple if-stack: True = execute, False = skip
@@ -393,7 +383,7 @@ def _truthy(val):
 def _eval_condition(ctx, cond):
     # type: (_Ctx, str) -> Optional[bool]
     """
-    Evaluate simple Tcl conditions used in LUBIS scripts.
+    Evaluate simple Tcl conditions used in VC Formal scripts.
     Returns None if unknown (keep both branches commented).
     """
     c = cond.strip()
@@ -679,7 +669,7 @@ def _fmt_lang(fmt):
         return "-sv12"
     if "sv17" in f:
         return "-sv17"
-    # default SystemVerilog for trainee / VC Formal sverilog
+    # default SystemVerilog for VC Formal -format sverilog
     return "-sv09"
 
 
@@ -985,7 +975,7 @@ def _handle_if_block(ctx, original):
         return True
 
     if known and chosen_body is None:
-        # all conditions false, no else (typical LUBIS auto_check 0)
+        # all conditions false, no else (e.g. auto_check 0)
         _emit(ctx, "# if-chain: no branch taken (flags evaluated false; interactive session)")
         ctx.mapped += 1
         return True
@@ -1050,7 +1040,7 @@ def _handle_set(ctx, tokens, original):
         ctx.mapped += 1
         return True
 
-    # Control flags used by LUBIS templates — keep as set for readability
+    # Common VC Formal control flags — keep as set for readability
     if name in (
         "auto_check",
         "auto_witness",
@@ -1388,7 +1378,7 @@ def _handle_read_file(ctx, tokens, original):
         ctx.vars.setdefault("design", top)
 
     lang = _fmt_lang(fmt)
-    # classic examples in this repo used -sv12
+    # filelist flows commonly use SystemVerilog 2012
     if filelist and lang == "-sv09":
         lang = "-sv12"
 
@@ -1607,8 +1597,7 @@ def _handle_create_reset(ctx, tokens, original):
         else:
             active_high = True
 
-    # LUBIS jasper style: reset -none + assume -reset <active expr>
-    # Also keep classic form available for simple public examples.
+    # Jasper FPV: reset -none + assume -reset <active expr>
     if active_low:
         ctx.reset_assume_expr = "!{}".format(rst)
         ctx.classic_reset_cmd = "reset ~{}".format(rst)
@@ -1616,7 +1605,7 @@ def _handle_create_reset(ctx, tokens, original):
         ctx.reset_assume_expr = rst
         ctx.classic_reset_cmd = "reset {}".format(rst)
 
-    # Prefer LUBIS style (matches trainee hand scripts)
+    # Prefer assume -reset so the pin is not tied after the reset phase
     if not ctx.reset_emitted:
         if ctx.clock_emitted:
             _emit_reset_block(ctx)

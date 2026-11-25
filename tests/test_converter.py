@@ -10,15 +10,24 @@ from vcf2jg.converter import (
     fix_riscv_formal_defines,
 )
 
-EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
-TRAINEE_A5 = Path(
-    "/home/Jayasimha/trainee/assignment_05_processor/design/vcf_prove.tcl"
-)
-
-
 class TestConverter(unittest.TestCase):
     def test_fpv_arbiter_basic(self):
-        text = (EXAMPLES / "vc_fpv_arbiter.tcl").read_text()
+        text = r"""
+set_app_var fml_mode_on true
+set_fml_appmode FPV
+
+set design arbiter
+read_file -top $design -format sverilog -aep all -sva -vcs {-f filelist.f}
+
+create_clock clk -period 100
+create_reset rst -high
+
+sim_run -stable
+sim_save_reset
+
+check_fv -block
+report_fv -list > fpv_results.txt
+"""
         result = convert_vc_tcl(text, source_name="vc_fpv_arbiter.tcl")
         out = result.jasper_tcl
 
@@ -41,7 +50,25 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(result.unmapped_count, 0)
 
     def test_active_low_reset_and_assume(self):
-        text = (EXAMPLES / "vc_fpv_with_assume.tcl").read_text()
+        text = r"""
+set_app_var fml_mode_on true
+set_fml_appmode FPV
+
+set design ntt_butterfly
+read_file -top $design -format sverilog -sva -vcs {-f ../filelist.f}
+
+create_clock clk -period 10
+create_reset rst_n -low
+
+sim_run -stable
+sim_save_reset
+
+fvassume -clock clk -expr {scan_en == 1'b0}
+fvassume -clock clk -expr {!test_mode}
+
+check_fv -block
+report_fv -list > results.txt
+"""
         result = convert_vc_tcl(text)
         out = result.jasper_tcl
 
@@ -129,8 +156,8 @@ read_file -top $design -format sverilog -sva -vcs {-f a.f}
         result = convert_vc_tcl("")
         self.assertIn("vcf2jg", result.jasper_tcl)
 
-    def test_lubis_analyze_elaborate_sim_force(self):
-        """Core dialect used by trainee assignment scripts."""
+    def test_analyze_elaborate_sim_force(self):
+        """analyze / elaborate / sim_force FPV flow."""
         text = r"""
 set SCRIPT_LOCATION [file dirname [file normalize [info script]]]
 cd $SCRIPT_LOCATION
@@ -176,7 +203,7 @@ check_fv
     def test_multiline_analyze_brace_list(self):
         text = r"""
 analyze -format sverilog -vcs " " {
-    lubis_latch.sv
+    latch.sv
     mmu.sv
 }
 analyze -format sverilog -vcs " -assert svaext +incdir+../rtl " {
@@ -188,7 +215,7 @@ sim_force rst_n -apply 1'b0
 check_fv
 """
         out = convert_vc_tcl(text).jasper_tcl
-        self.assertIn("analyze -sv09 lubis_latch.sv mmu.sv", out)
+        self.assertIn("analyze -sv09 latch.sv mmu.sv", out)
         self.assertIn("+incdir+../rtl", out)
         self.assertIn("fv_mmu.sv", out)
         self.assertIn("elaborate -top mmu", out)
@@ -325,28 +352,6 @@ if {$exit_after_execution} {
         text = "snip_driver {a.b c.d}\n"
         out = convert_vc_tcl(text).jasper_tcl
         self.assertIn("stopat a.b c.d", out)
-
-    def test_assignment5_file(self):
-        if not TRAINEE_A5.is_file():
-            self.skipTest("trainee assignment_05 not present")
-        text = TRAINEE_A5.read_text(encoding="utf-8", errors="replace")
-        result = convert_vc_tcl(text, source_name=str(TRAINEE_A5))
-        out = result.jasper_tcl
-        # Match hand-written Documents/trainee jasper.tcl intent
-        self.assertIn("clear -all", out)
-        self.assertIn("analyze -sv09 processor_package.sv", out)
-        self.assertIn("analyze -sv09 processor.sv", out)
-        self.assertIn("analyze -sv09 fv_processor.sv", out)
-        self.assertIn("elaborate -top processor", out)
-        self.assertIn("clock clk", out)
-        self.assertIn("reset -none", out)
-        self.assertIn("assume -reset rst", out)
-        self.assertIn("prove -all", out)
-        self.assertEqual(
-            result.unmapped_count,
-            0,
-            msg="unmapped: {}".format(result.warnings),
-        )
 
 
 class TestQuickGuideCommands(unittest.TestCase):
