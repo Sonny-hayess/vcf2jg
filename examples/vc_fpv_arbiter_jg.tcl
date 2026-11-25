@@ -4,8 +4,7 @@
 # =============================================================================
 
 # Example VC Formal FPV script (from common public FPV flows)
-# [vcf2jg skip] VC Formal app var (no JasperGold equivalent)
-# set_app_var fml_mode_on true
+# VC Formal fml_mode_on true — Jasper FPV is always formal
 # VC Formal appmode: FPV → Formal Property Verification (default FPV flow)
 
 # VC Formal: set design arbiter  →  elaborate -top
@@ -18,10 +17,8 @@ clock clk  ;# period 100 (JG FPV ignores absolute period)
 reset -none
 assume -reset rst
 
-# [vcf2jg skip] sim_run: JasperGold applies reset via 'reset' / assume -reset
-# sim_run -stable
-# [vcf2jg skip] sim_save_reset: covered by JasperGold reset -none + assume -reset
-# sim_save_reset
+# sim_run -stable: Jasper reset analysis holds reset until the design is stable
+# sim_save_reset: captured by Jasper 'reset' / 'assume -reset' above
 
 prove -all
-report_proofs -verbose > fpv_results.txt
+report -results -file fpv_results.txt -force

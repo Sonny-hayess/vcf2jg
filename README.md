@@ -73,31 +73,70 @@ create_reset rst -high
 
 ## Command mapping
 
+Mappings follow the **VC Formal Property Checking App Quick Guide** and
+Jasper Apps Command Reference 2025.03.
+
 | VC Formal | JasperGold |
 |-----------|------------|
 | `set_fml_appmode FPV` | Comment (FPV-style flow) |
 | `set_fml_appmode COV` / `FCA` | Enables `check_cov -init` / `-measure` |
-| `set_app_var` / `set_fml_var` | Skipped |
-| `analyze -format sverilog -vcs "a.sv"` | `analyze -sv09 a.sv` |
+| `set_app_var fml_auto_save` | `set_database_auto_save_restore` |
+| `set_app_var` (other) | Comment (no 1:1 Jasper var) |
+| `set_fml_var fml_witness_on` / `fml_vacuity_on` | `elaborate -create_related_covers {witness\|precondition}` |
+| `set_fml_var fml_effort high\|bounded\|bug_hunting\|discovery` | `set_engine_mode {Ht Hp B I N}` / `{B}` / `{Bm J}` / `{D}` |
+| `set_fml_var fml_max_time 2H` | `set_prove_time_limit 2h` |
+| `set_fml_var fml_progress_time_limit` | `set_prove_time_limit` |
+| `set_fml_var fml_reset_property_check true` | `check_reset` |
+| `analyze` / `analyze_design -format sverilog -vcs "a.sv"` | `analyze -sv09 a.sv` |
 | `analyze ... -vcs "-assert svaext f.sv"` | `analyze -sv09 f.sv` |
 | `analyze ... { multi-line files }` | `analyze -sv09 files...` |
 | `analyze ... +incdir+PATH` | `analyze -sv09 +incdir+PATH ...` |
+| `analyze ... rvfi_macros.vh ...` | `analyze -sv12 -mfcu +incdir+<dir> ...` (header, not a source) |
+| NERV/RVFI `sim_force reset` | `reset reset` (Jasper native; LUBIS labs still use `reset -none` + `assume -reset`) |
+| sibling `defines.sv` (riscv-formal) | last-line CSR `\` stripped; `` `define YOSYS `` dropped |
 | `read_file -top X -vcs {-f flist.f}` | `clear -all` / `analyze -f flist.f` / `elaborate -top X` |
 | `elaborate $top -verbose -sva` | `elaborate -top $top -create_related_covers {precondition witness}` |
 | `elaborate t -vcs "-pvalue+A=1"` | `elaborate -top t -parameter A 1 ...` |
+| `set_blackbox -design M` | `elaborate -bbox_m M` |
+| `set_blackbox -cells inst` | `elaborate -bbox_i inst` |
+| `report_blackbox` | `get_design_info -list {bbox_mod bbox_inst}` |
+| `set_constant sig -value 0` | `assume -name const_sig {sig == 0}` |
 | `create_clock clk -period N` | `clock clk` |
 | `create_reset rst -sense high` / `-high` | `reset -none` + `assume -reset rst` |
 | `create_reset rst_n -sense low` / `-low` | `reset -none` + `assume -reset !rst_n` |
 | `sim_force rst -apply 1'b1` | `reset -none` + `assume -reset rst` |
 | `sim_force rst_n -apply 1'b0` | `reset -none` + `assume -reset !rst_n` |
-| `sim_run -stable` / `sim_save_reset` | Skipped (covered by reset setup) |
+| `sim_force sig -apply val` (non-reset) | `assume -bound 0 {sig == val}` |
+| `sim_run -stable` / `sim_save_reset` | Covered by Jasper reset analysis |
+| `sim_run N -clk clk` | `reset -none -max_iterations N` |
+| `sim_set_state -uninitialized -apply 'b0` | `reset -non_resettable_regs 0` |
+| `sim_get net` | `get_signal_info net` |
+| `report_fv_complexity` | `get_design_info` |
+| `set_change_at -default -clock clk -posedge` | `clock -rate -default clk` |
+| `set_grid_usage -type LSF=N` | `set_engine_processes N` + `prove -max_jobs N` |
+| `fvassume prop` | `assume -from_assert {prop}` |
+| `fvassume -expr {...}` | `assume {...}` |
+| `fvassert name -expr {...}` | `assert -name name {...}` |
+| `fvcover name -expr {...}` | `cover -name name {...}` |
+| `fvenable` / `fvdisable` | `assert/cover/assume -enable` / `-disable` |
 | `check_fv` / `check_fv -block` | `prove -all` |
 | `check_fv -subtype witness` | `prove -all -covers` |
-| `report_fv -list > file` | `report_proofs -verbose > file` |
-| `fvassume -expr {...}` | `assume {...}` |
-| `set_blackbox -cells X` | `elaborate -bbox_m X` |
-| `snip_driver {a b}` | `stopat a b` |
-| `set_change_at ...` | Skipped (review `clock -rate`) |
+| `check_fv -break N` | `prove -all -cex_limit N` |
+| `check_fv -stop` | `prove -stop` |
+| `check_fv -run_finish {report_fv}` | `prove -all` then converted callback |
+| `report_fv` / `-list` / `-verbose` | `report` / `report -results` / `report -detailed` |
+| `view_trace prop` | `visualize -violation -property {prop} -new_window` |
+| `view_trace -reset` | `reset -analyze` |
+| `snip_drive(r) {a b}` | `stopat a b` |
+| `set_abstractions -construct {mul=N counter=M}` | `get_design_info -list {multiplier counter}` + `abstract -counter` |
+| `compute_reduced_constraints -prop p` | `get_needed_assumptions -property p` |
+| `compute_formal_core -property ...` | `check_cov -init/-measure -type proof` |
+| `save_session` | `save database -include session_data` |
+| `fvtask -create T` | `task -create T` |
+| `fvtask T -copy S` | `task -create T -source_task S -copy_all` |
+| `fvtask T` / `get_fvtask` | `task -set T` / `task` |
+| `get_props -status proven` | `get_property_list -include {status proven}` |
+| `help` / `man` | `help` |
 | `cd $SCRIPT_LOCATION` | Kept |
 | Simple `if {$flag} { ... }` | Evaluated when flag is a known 0/1 |
 | `fta_init` / `compute_fta` | TODO (no 1:1 FPV mapping) |

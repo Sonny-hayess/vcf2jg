@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from vcf2jg import __version__
-from vcf2jg.converter import convert_file, convert_vc_tcl
+from vcf2jg.converter import convert_file, convert_vc_tcl, patch_companion_defines
 
 
 def build_parser():
@@ -71,6 +71,7 @@ def main(argv=None):
         if args.stdout and args.output is None:
             text = args.input.read_text(encoding="utf-8", errors="replace")
             result = convert_vc_tcl(text, source_name=str(args.input))
+            patch_companion_defines(args.input, result)
             sys.stdout.write(result.jasper_tcl)
         else:
             out = args.output
@@ -79,6 +80,7 @@ def main(argv=None):
             if args.stdout:
                 text = args.input.read_text(encoding="utf-8", errors="replace")
                 result = convert_vc_tcl(text, source_name=str(args.input))
+                patch_companion_defines(args.input, result)
                 sys.stdout.write(result.jasper_tcl)
             else:
                 result = convert_file(args.input, out)
